@@ -1,0 +1,71 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress
+  template:
+    metadata:
+      labels:
+        app: wordpress
+    spec:
+      containers:
+      - name: wordpress-app
+        image: docker.io/qaisarwaseem/wordpress:latest               #quay.io/jonasbjork/lernialab:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: wordpress-data
+          mountPath: /opt/app-root/src
+        - name: wp-config-file
+          mountPath: /opt/app-root/src/wp-config.php
+          subPath: wp-config.php
+      volumes:
+      - name: wp-config-file
+        configMap:
+          name: wp-config-php
+          items:
+          - key: wp-config.php
+            path: wp-config.php
+      - name: wordpress-data
+        persistentVolumeClaim:
+          claimName: wordpress-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: wordpress
+  sessionAffinity: None
+  type: ClusterIP
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: wordpress
+spec:
+  host: qsrwordpress.apps.cluster3.karoshi.se
+  port:
+    targetPort: 8080
+  to:
+    kind: Service
+    name: wordpress
+    weight: 100
+  wildcardPolicy: None
